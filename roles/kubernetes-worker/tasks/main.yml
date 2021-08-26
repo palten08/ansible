@@ -1,0 +1,3 @@
+---
+- name: Join the worker to the cluster
+  ansible.builtin.command: "{{ hostvars['variable_store']['join_token'] }}"

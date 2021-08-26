@@ -1,0 +1,24 @@
+---
+- name: Kubernetes base
+  become: yes
+  become_method: sudo
+  hosts: kubernetes
+  gather_facts: true
+  roles:
+  - kubernetes-base
+
+- name: Kubernetes master
+  become: yes
+  become_method: sudo
+  hosts: kubernetes_master
+  gather_facts: true
+  roles:
+  - kubernetes-master
+
+- name: Kubernetes worker
+  become: yes
+  become_method: sudo
+  hosts: kubernetes_worker
+  gather_facts: true
+  roles:
+  - kubernetes-worker

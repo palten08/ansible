@@ -1,0 +1,91 @@
+---
+- name: Stop firewalld
+  ansible.builtin.systemd:
+    state: stopped
+    name: firewalld
+
+- name: Disable swap on all known swap files and devices
+  ansible.builtin.command: swapoff -a
+
+- name: Modify fstab to disable swap
+  ansible.builtin.command: sed -i '/ swap / s/^/#/' /etc/fstab
+
+- name: Install yum utils
+  yum:
+    name:
+      - yum-utils
+    state: latest
+
+- name: Add the Docker CE repo
+  ansible.builtin.command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+- name: Install Docker CE
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: latest
+
+- name: Enable and start Docker CE through systemd
+  ansible.builtin.systemd:
+    state: started
+    name: docker
+    enabled: true
+
+- name: Change the Docker cgroup driver to systemd to avoid conflicts with Kubelet
+  ansible.builtin.template:
+    src: docker_daemon.json
+    dest: /etc/docker/daemon.json
+
+- name: Reload the systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Restart Docker
+  ansible.builtin.systemd:
+    state: restarted
+    name: docker
+
+- name: Add the br_netfilter kernel module
+  ansible.builtin.command: modprobe br_netfilter
+
+- name: Add the br_netfilter kernel module so it loads during boot
+  ansible.builtin.template:
+    src: modules-loadd_k8s.conf
+    dest: /etc/modules-load.d/k8s.conf
+
+- name: Allow iptables to see bridged traffic
+  ansible.builtin.template:
+    src: sysctl_k8s.conf
+    dest: /etc/sysctl.d/k8s.conf
+
+- name: Set the new kernel parameters
+  ansible.builtin.command: sysctl --system
+
+- name: Add the Kubernetes repo
+  yum_repository:
+    name: Kubernetes
+    description: Kubernetes repo
+    baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+    gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+    gpgcheck: yes
+
+- name: Disable SELinux
+  ansible.builtin.command: setenforce 0
+
+- name: Change SELinux to permissive in the config
+  ansible.builtin.command: sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+
+- name: Install kubelet, kubeadm, and kubectl
+  yum:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+
+- name: Enable and start the kubelet service
+  ansible.builtin.systemd:
+    state: started
+    name: kubelet
+    enabled: true
